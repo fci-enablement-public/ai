@@ -40,8 +40,10 @@ log.info "deleting previous deployment"
 kubectl delete deploy fcaiol 2> /dev/null
 
 log.info "creating deployment"
-path=/tmp/aml-install/deploy/fcaiol-deploy.yaml 
-cat > $path <<-EOF
+base='/tmp/FCAI 1.0.1 APAR1/fcai-install/deploy'
+log.warn "NOTE: This script assumes that your deployment directory is: ${base}. If that's incorrect, change this script on the line shown to the left."
+path="${base}/fcaiol-deploy.yaml"
+cat > "${path}" <<-EOF
         apiVersion: apps/v1beta1 
         kind: Deployment 
         metadata: 
@@ -71,14 +73,14 @@ cat > $path <<-EOF
 EOF
 
 # validate file creation
-[[ -f $path ]] && log.info "created $path" || log.error "could not create $path"
+[[ -f "${path}" ]] && log.info "created "${path}"" || log.error "could not create "${path}""
 
 # create deployment
 log.info "creating new deployment"
-kubectl create -f $path
+kubectl create -f "${path}"
 
-log.info "naively waiting 15 seconds for openldap pod to start on the scheduled Node. If you can't log in to AML when this script finishes, please re-run the script."
-sleep 15 
+log.info "naively waiting 10 seconds for openldap pod to start on the scheduled Node (it could take 60 seconds or longer in reality). If you can't log in to AML when this script finishes, please re-run this script."
+sleep 10 
 
 # service
 log.div "Configuring openldap service"
@@ -87,8 +89,8 @@ log.info "deleting any previous openldap service"
 kubectl delete svc openldap 2> /dev/null
 
 log.info "Creating openldap service"
-path=/tmp/aml-install/deploy/fcaiol-svc.yaml 
-cat > $path <<-EOL
+path="${base}/fcaiol-svc.yaml"
+cat > "${path}" <<-EOL
 	apiVersion: v1
 	kind: Service
 	metadata:
@@ -106,53 +108,58 @@ cat > $path <<-EOL
 EOL
 
 # validate file creation
-[[ -f $path ]] && log.info "created $path" || log.error "could not create $path"
+[[ -f "${path}" ]] && log.info "created "${path}"" || log.error "could not create "${path}""
 
 log.info "creating service"
-kubectl create -f $path
+kubectl create -f "${path}"
 
 log.div "Update Config Map"
-path=/tmp/aml-install/deploy/fcai-configmap.yaml
+path="${base}/fcai-configmap.yaml"
 
 # validate path exists
-[[ -f $path ]] || log.error "$path does not exist. This script will probably fail."
+[[ -f "${path}" ]] || log.error ""${path}" does not exist. This script will probably fail."
 
 log.info "updating config map values for openldap"
-sed -i '/GROUP_ANALYST/c\    AML_GROUP_ANALYST: "cn=analysts,dc=ibm,dc=com"' $path
-sed -i '/GROUP_INVESTIGATOR/c\    AML_GROUP_INVESTIGATOR: "cn=investigators,dc=ibm,dc=com"' $path
-sed -i '/GROUP_SUPERVISOR/c\    AML_GROUP_SUPERVISOR: "cn=supervisors,dc=ibm,dc=com"' $path
-sed -i '/GROUP_ADMIN/c\    AML_GROUP_ADMIN: "cn=admins,dc=ibm,dc=com"' $path
-sed -i '/E_ID/c\    AML_LDAP_PROFILE_ID: "uid"' $path
-sed -i '/E_EMAIL/c\    AML_LDAP_PROFILE_EMAIL: "mail"' $path
-sed -i '/E_DISPLAYNAME/c\    AML_LDAP_PROFILE_DISPLAYNAME: "displayName"' $path
-sed -i '/E_GROUPS/c\    AML_LDAP_PROFILE_GROUPS: "memberOf"' $path
-sed -i '/ER_URL/c\    AML_LDAP_SERVER_URL: "ldaps://openldap:636"' $path
-sed -i '/R_BINDDN/c\    AML_LDAP_SERVER_BINDDN: "cn=Manager,dc=ibm,dc=com"' $path
-sed -i '/DCREDENTIALS/c\    AML_LDAP_SERVER_BINDCREDENTIALS: "aml4u"' $path
-sed -i '/ARCHBASE/c\    AML_LDAP_SERVER_SEARCHBASE: "dc=ibm,dc=com"' $path
-sed -i '/E_MAPPING/c\    AML_LDAP_SERVER_USERNAME_MAPPING: "uid"' $path
-sed -i '/ER_CERT/c\    AML_LDAP_SERVER_CERT: "ldap.crt"' $path
+sed -i '/GROUP_ANALYST/c\    AML_GROUP_ANALYST: "cn=analysts,dc=ibm,dc=com"' "${path}"
+sed -i '/GROUP_INVESTIGATOR/c\    AML_GROUP_INVESTIGATOR: "cn=investigators,dc=ibm,dc=com"' "${path}"
+sed -i '/GROUP_SUPERVISOR/c\    AML_GROUP_SUPERVISOR: "cn=supervisors,dc=ibm,dc=com"' "${path}"
+sed -i '/GROUP_ADMIN/c\    AML_GROUP_ADMIN: "cn=admins,dc=ibm,dc=com"' "${path}"
+sed -i '/E_ID/c\    AML_LDAP_PROFILE_ID: "uid"' "${path}"
+sed -i '/E_EMAIL/c\    AML_LDAP_PROFILE_EMAIL: "mail"' "${path}"
+sed -i '/E_DISPLAYNAME/c\    AML_LDAP_PROFILE_DISPLAYNAME: "displayName"' "${path}"
+sed -i '/E_GROUPS/c\    AML_LDAP_PROFILE_GROUPS: "memberOf"' "${path}"
+sed -i '/ER_URL/c\    AML_LDAP_SERVER_URL: "ldaps://openldap:636"' "${path}"
+sed -i '/R_BINDDN/c\    AML_LDAP_SERVER_BINDDN: "cn=Manager,dc=ibm,dc=com"' "${path}"
+sed -i '/DCREDENTIALS/c\    AML_LDAP_SERVER_BINDCREDENTIALS: "aml4u"' "${path}"
+sed -i '/ARCHBASE/c\    AML_LDAP_SERVER_SEARCHBASE: "dc=ibm,dc=com"' "${path}"
+sed -i '/E_MAPPING/c\    AML_LDAP_SERVER_USERNAME_MAPPING: "uid"' "${path}"
+sed -i '/ER_CERT/c\    AML_LDAP_SERVER_CERT: "ldap.crt"' "${path}"
+
+log.info "allowing self-signed certificates. do NOT do this in production!!! See nodejs GitHub issue 5258"
+INSECURE='NODE_TLS_REJECT_UNAUTHORIZED: "0"'
+grep -q -F "${INSECURE}" "${path}" || echo "${INSECURE}" >> "${path}"
 
 log.info "deleting and recreating map"
 kubectl delete cm fcai-config
-kubectl create -f $path
+kubectl create -f "${path}"
 log.info "waiting 5 seconds for the config map to be recreated"
 sleep 5 
 
 log.div "Adding openldap's certificate to nodejs"
-path=/tmp/aml-install/deploy/ldap.crt
-log.info "copying openldap pod's cert to $path"
-echo "kubectl exec -ti $(kubectl get pods | grep fcaiol | awk '{print $1}') -- /usr/bin/cat /etc/openldap/certs/slapd-crt.pem > $path"
-kubectl exec -ti $(kubectl get pods | grep fcaiol | awk '{print $1}') -- /usr/bin/cat /etc/openldap/certs/slapd-crt.pem > $path
+path="${base}/ldap.crt"
+log.info "copying openldap pod's cert to "${path}""
+echo "kubectl exec -ti $(kubectl get pods | grep fcaiol | awk '{print $1}') -- /usr/bin/cat /etc/openldap/certs/slapd-crt.pem > "${path}""
+kubectl exec -ti $(kubectl get pods | grep fcaiol | awk '{print $1}') -- /usr/bin/cat /etc/openldap/certs/slapd-crt.pem > "${path}"
 
 # validate path exists
-[[ -f $path ]] || log.error "$path does not exist. This script will probably fail."
+[[ -f "${path}" ]] || log.error ""${path}" does not exist. This script will probably fail."
 
 log.info "recreating kubernetes certs volume"
 kubectl delete secret fcai-tls
 
 log.info "moving into deploy folder"
-cd /tmp/aml-install/deploy
+path="${base}"
+cd "${path}"
 kubectl create secret generic fcai-tls --from-file=fcai.crt --from-file=fcai.pem --from-file=db2.crt --from-file=ldap.crt
 log.info "deleting the nodejs pod, which will be automatically recreated"
 kubectl delete pod $(kubectl get pods | grep fcainodejs | awk '{print $1}')
