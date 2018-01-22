@@ -75,7 +75,7 @@ cat > "${rs_path}" <<-EOF
                  name: fcaiol
              spec: 
                containers: 
-               - name: openldap
+               - name: fcaiol
                  image: fcienablementpublic/openldap
                  imagePullPolicy: Always
                  ports: 
@@ -143,10 +143,12 @@ grep -q -F "${INSECURE}" "${cm_path}" || echo "${INSECURE}" >> "${cm_path}"
 fcai-docker create -f fcai-configmap.yaml --dbHost 172.19.0.2 --dbPort 56000 --esHost 172.19.0.4 --esPort 9200 --lsHost 172.19.0.5 --lsPort 5000 --redisHost 172.19.0.6 --redisPort 6379
 
 log.div "Adding openldap's certificate to nodejs"
+# make time for the container to extract the slapd cert
+sleep 10 
 path="${base}/ldap.crt"
 log.info "copying openldap cert to "${path}""
-echo "docker exec -ti $(docker ps -f name=fcaiol) -- /usr/bin/cat /etc/openldap/certs/slapd-crt.pem > "${path}""
-docker exec -ti $(docker ps -f name=fcaiol) -- /usr/bin/cat /etc/openldap/certs/slapd-crt.pem > "${path}"
+echo "docker cp $(docker ps -q -f name=fcaiol):/etc/openldap/certs/slapd-crt.pem $path"
+docker cp $(docker ps -q -f name=fcaiol):/etc/openldap/certs/slapd-crt.pem $path
 
 # validate path exists
 [[ -f "${path}" ]] || log.error ""${path}" does not exist. This script will probably fail."
