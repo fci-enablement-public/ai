@@ -155,7 +155,7 @@ docker cp $(docker ps -q -f name=fcaiol):/etc/openldap/certs/slapd-crt.pem $path
 
 log.info "re-creating the nodejs container"
 fcai-docker delete -f fcainodejs-rs.yaml
-fcai-docker create -f fcainodejs-rs.yaml  -s fcainodejs-service.yaml --ipAddress 172.19.0.7 -u 1000 --copy "$base/*.crt $base/*.pem"
+fcai-docker create -f fcainodejs-rs.yaml  -s fcainodejs-service.yaml --ipAddress 172.19.0.7 -u 1000 --copy "$base/*.crt,$base/*.pem"
 
 log.div "Script completed"
 echo
