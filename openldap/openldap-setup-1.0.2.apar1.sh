@@ -130,7 +130,8 @@ sed -i '/E_DISPLAYNAME/c\    AML_LDAP_PROFILE_DISPLAYNAME: "displayName"' "${pat
 sed -i '/E_GROUPS/c\    AML_LDAP_PROFILE_GROUPS: "memberOf"' "${path}"
 sed -i '/ER_URL/c\    AML_LDAP_SERVER_URL: "ldaps://openldap:636"' "${path}"
 sed -i '/R_BINDDN/c\    AML_LDAP_SERVER_BINDDN: "cn=Manager,dc=ibm,dc=com"' "${path}"
-sed -i '/DCREDENTIALS/c\    AML_LDAP_SERVER_BINDCREDENTIALS: "{base64}YW1sNHU="' "${path}"
+sed -i '/AML_LDAP_SERVER_BINDCREDENTIALS/d' "${cm_path}"
+echo '    AML_LDAP_SERVER_BINDCREDENTIALS: "{base64}YW1sNHU="' >> ${cm_path}
 sed -i '/ARCHBASE/c\    AML_LDAP_SERVER_SEARCHBASE: "dc=ibm,dc=com"' "${path}"
 sed -i '/E_MAPPING/c\    AML_LDAP_SERVER_USERNAME_MAPPING: "uid"' "${path}"
 sed -i '/ER_CERT/c\    AML_LDAP_SERVER_CERT: "ldap.crt"' "${path}"
