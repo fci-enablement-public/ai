@@ -36,18 +36,18 @@ alias log.div=separator
 log.div "Configuring openldap deployment"
 
 # delete previous deployment
-log.info "deleting previous deployment"
-kubectl delete deploy fcaiol 2> /dev/null
+log.info "deleting any previous fcai-openldap deployment"
+kubectl delete deploy fcai-openldap 2> /dev/null
 
 log.info "creating deployment"
-base='/tmp/FCAI 1.0.1 APAR1/fcai-install/deploy'
+base="/fcai/fcai-install/deploy"
 log.warn "NOTE: This script assumes that your deployment directory is: ${base}. If that's incorrect, change this script on the line shown to the left."
-path="${base}/fcaiol-deploy.yaml"
+path="${base}/fcai-openldap-deploy.yaml"
 cat > "${path}" <<-EOF
         apiVersion: apps/v1beta1 
         kind: Deployment 
         metadata: 
-          name: fcaiol
+          name: fcai-openldap
         spec : 
           replicas: 1 
           minReadySeconds: 10 
@@ -59,7 +59,7 @@ cat > "${path}" <<-EOF
           template: 
              metadata: 
                labels: 
-                 name: fcaiol
+                 name: fcai-openldap
              spec: 
                containers: 
                - name: openldap
@@ -78,8 +78,8 @@ EOF
 # create deployment
 log.info "creating new deployment"
 kubectl create -f "${path}"
-
-log.info "naively waiting 10 seconds for openldap pod to start on the scheduled Node (it could take 60 seconds or longer in reality). If you can't log in to AML when this script finishes, please re-run this script."
+log.div "NOTE!"
+log.info "Optimistically waiting 10 seconds for openldap pod to start on the scheduled Node (it could take 60 seconds or longer in reality). If you can't log in when this script finishes, please re-run this script."
 sleep 10 
 
 # service
@@ -89,7 +89,7 @@ log.info "deleting any previous openldap service"
 kubectl delete svc openldap 2> /dev/null
 
 log.info "Creating openldap service"
-path="${base}/fcaiol-svc.yaml"
+path="${base}/fcai-openldap-svc.yaml"
 cat > "${path}" <<-EOL
 	apiVersion: v1
 	kind: Service
@@ -104,7 +104,7 @@ cat > "${path}" <<-EOL
 	    name: ldaps 
 	    targetPort: 636
 	  selector:
-	    name: fcaiol 
+	    name: fcai-openldap 
 EOL
 
 # validate file creation
@@ -130,14 +130,14 @@ sed -i '/E_DISPLAYNAME/c\    AML_LDAP_PROFILE_DISPLAYNAME: "displayName"' "${pat
 sed -i '/E_GROUPS/c\    AML_LDAP_PROFILE_GROUPS: "memberOf"' "${path}"
 sed -i '/ER_URL/c\    AML_LDAP_SERVER_URL: "ldaps://openldap:636"' "${path}"
 sed -i '/R_BINDDN/c\    AML_LDAP_SERVER_BINDDN: "cn=Manager,dc=ibm,dc=com"' "${path}"
-sed -i '/AML_LDAP_SERVER_BINDCREDENTIALS/d' "${cm_path}"
-echo '    AML_LDAP_SERVER_BINDCREDENTIALS: "{base64}YW1sNHU="' >> ${cm_path}
+sed -i '/AML_LDAP_SERVER_BINDCREDENTIALS/d' "${path}"
+echo '    AML_LDAP_SERVER_BINDCREDENTIALS: "{base64}YW1sNHU="' >> ${path}
 sed -i '/ARCHBASE/c\    AML_LDAP_SERVER_SEARCHBASE: "dc=ibm,dc=com"' "${path}"
 sed -i '/E_MAPPING/c\    AML_LDAP_SERVER_USERNAME_MAPPING: "uid"' "${path}"
 sed -i '/ER_CERT/c\    AML_LDAP_SERVER_CERT: "ldap.crt"' "${path}"
 
 log.info "allowing self-signed certificates. do NOT do this in production!!! See nodejs GitHub issue 5258"
-INSECURE='NODE_TLS_REJECT_UNAUTHORIZED: "0"'
+INSECURE='    NODE_TLS_REJECT_UNAUTHORIZED: "0"'
 grep -q -F "${INSECURE}" "${path}" || echo "${INSECURE}" >> "${path}"
 
 log.info "deleting and recreating map"
@@ -149,8 +149,8 @@ sleep 5
 log.div "Adding openldap's certificate to nodejs"
 path="${base}/ldap.crt"
 log.info "copying openldap pod's cert to "${path}""
-echo "kubectl exec -ti $(kubectl get pods | grep fcaiol | awk '{print $1}') -- /usr/bin/cat /etc/openldap/certs/slapd-crt.pem > "${path}""
-kubectl exec -ti $(kubectl get pods | grep fcaiol | awk '{print $1}') -- /usr/bin/cat /etc/openldap/certs/slapd-crt.pem > "${path}"
+echo "kubectl exec -ti $(kubectl get pods | grep fcai-openldap | awk '{print $1}') -- /usr/bin/cat /etc/openldap/certs/slapd-crt.pem > "${path}""
+kubectl exec -ti $(kubectl get pods | grep fcai-openldap | awk '{print $1}') -- /usr/bin/cat /etc/openldap/certs/slapd-crt.pem > "${path}"
 
 # validate path exists
 [[ -f "${path}" ]] || log.error ""${path}" does not exist. This script will probably fail."
@@ -167,4 +167,21 @@ kubectl delete pod $(kubectl get pods | grep fcainodejs | awk '{print $1}')
 cd -
 
 log.div "Script completed"
+log.info "Verify the results above and try to login below. Re-run this script if you're seeing problems."
+
+log.div "Next Steps"
+printf "%-30s%-30s\n" "Open this URL" "https://$(hostname -f):30400"
+printf "%-30s%-30s\n" "Enter your credentials" "(See the list below)"
+
+log.div "Usernames and Passwords"
+printf "%-30s%-30s\n" "admin1" "aml4u"
+printf "%-30s%-30s\n" "investigator1" "aml4u"
+printf "%-30s%-30s\n" "supervisor1" "aml4u"
+printf "%-30s%-30s\n" "analyst1" "aml4u"
+
+log.div "Troubleshooting"
+printf "%-30s%-30s\n" "Inspect UI's logs" "kubectl logs \$(kubectl get pods | grep fcainodejs | awk '{print \$1}')"
+printf "%-30s%-30s\n" "Correct script?" "This script is $(basename $0). If you installed FCAI APAR1 but this script does not contain 'apar1' in its filename, then you may be running the wrong script."
+
+echo
 echo
