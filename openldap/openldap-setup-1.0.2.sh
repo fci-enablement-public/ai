@@ -189,10 +189,11 @@ printf "%-30s%-30s\n" "Inspect UI's logs" "kubectl logs \$(kubectl get pods | gr
 printf "%-30s%-30s\n" "Correct script?" "If you have an APAR (e.g., apar1), be sure this script is specific to that APAR."
 
 log.div "Optional: LDAP client"
-printf "%-30s%-30s\n" "Configure LDAP client 1/4" "Point your LDAP client here: ldaps://fcai-openldap:30636"
-printf "%-30s%-30s\n" "Configure LDAP client 2/4" "In LDAP client's /etc/hosts (or equivalent), add this entry (modify as needed): ${IP} fcai-openldap"
-printf "%-30s%-30s\n" "Configure LDAP client 3/4" "Login/bind as: cn=Manager,dc=ibm,dc=com with password: aml4u"
-printf "%-30s%-30s\n" "Configure LDAP client 4/4" "Run this command and add the resulting cert into your ldap client: cat ${base}/ldap.crt"
+printf "%-30s%-30s\n" "Configure LDAP client 1/5" "Point your LDAP client here: ldaps://fcai-openldap:30636"
+printf "%-30s%-30s\n" "Configure LDAP client 2/5" "In LDAP client's /etc/hosts (or equivalent), add this entry (modify as needed): ${IP} fcai-openldap"
+printf "%-30s%-30s\n" "Configure LDAP client 3/5" "Login/bind as: cn=Manager,dc=ibm,dc=com with password: aml4u"
+printf "%-30s%-30s\n" "Configure LDAP client 4/5" "Run this command and add the resulting cert into your ldap client: cat ${base}/ldap.crt"
+printf "%-30s%-30s\n" "Configure LDAP client 5/5" "Test a connection from the client: ldapsearch -d5 -x -H ldaps://fcai-openldap:30636 -D cn=Manager,dc=ibm,dc=com -w aml4u -b dc=ibm,dc=com -s sub 'objectclass=*' 2>&1| less"
 
 echo
 echo
