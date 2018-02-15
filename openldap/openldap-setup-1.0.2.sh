@@ -181,7 +181,7 @@ printf "%-30s%-30s\n" "analyst1" "aml4u"
 
 log.div "Troubleshooting"
 printf "%-30s%-30s\n" "Inspect UI's logs" "kubectl logs \$(kubectl get pods | grep fcainodejs | awk '{print \$1}')"
-printf "%-30s%-30s\n" "Correct script?" "This script is $(basename $0). If you installed FCAI APAR1 but this script does not contain 'apar1' in its filename, then you may be running the wrong script."
+printf "%-30s%-30s\n" "Correct script?" "If you have apar1, be sure this script is specific to apar1."
 
 echo
 echo
