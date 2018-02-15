@@ -43,33 +43,35 @@ log.info "creating deployment"
 base="/fcai/fcai-install/deploy"
 log.warn "NOTE: This script assumes that your deployment directory is: ${base}. If that's incorrect, change this script on the line shown to the left."
 path="${base}/fcai-openldap-deploy.yaml"
-cat > "${path}" <<-EOF
-        apiVersion: apps/v1beta1 
-        kind: Deployment 
-        metadata: 
-          name: fcai-openldap
-        spec : 
-          replicas: 1 
-          minReadySeconds: 10 
-          strategy : 
-             type: RollingUpdate 
-             rollingUpdate: 
-               maxUnavailable: 1 
-               maxSurge: 1 
-          template: 
-             metadata: 
-               labels: 
-                 name: fcai-openldap
-             spec: 
-               containers: 
-               - name: openldap
-                 image: fcienablementpublic/openldap
-                 imagePullPolicy: Always
-                 ports: 
-                 - containerPort: 389
-                   name: ldap
-                 - containerPort: 636
-                   name: ldaps
+cat > "${path}" <<EOF
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: fcai-openldap
+spec :
+  replicas: 1
+  minReadySeconds: 10
+  strategy :
+     type: RollingUpdate
+     rollingUpdate:
+       maxUnavailable: 1
+       maxSurge: 1
+  template:
+     metadata:
+       labels:
+         name: fcai-openldap
+     spec:
+       containers:
+       - name: fcai-openldap
+         image: fcienablementpublic/openldap:1.0.2
+         imagePullPolicy: Always
+         ports:
+         - containerPort: 389
+           name: ldap
+           hostPort: 11389
+         - containerPort: 636
+           name: ldaps
+           hostPort: 11636
 EOF
 
 # validate file creation
@@ -86,7 +88,7 @@ sleep 10
 log.div "Configuring openldap service"
 # delete previous deployment
 log.info "deleting any previous openldap service"
-kubectl delete svc openldap 2> /dev/null
+kubectl delete svc fcai-openldap 2> /dev/null
 
 log.info "Creating openldap service"
 path="${base}/fcai-openldap-svc.yaml"
@@ -94,15 +96,16 @@ cat > "${path}" <<-EOL
 	apiVersion: v1
 	kind: Service
 	metadata:
-	  name: openldap
+	  name: fcai-openldap
 	spec:
+	  type: NodePort
 	  ports:
 	  - port: 389
 	    name: ldap
-	    targetPort: 389
+	    nodePort: 30389
 	  - port: 636
 	    name: ldaps 
-	    targetPort: 636
+	    nodePort: 30636
 	  selector:
 	    name: fcai-openldap 
 EOL
@@ -128,7 +131,7 @@ sed -i '/E_ID/c\    AML_LDAP_PROFILE_ID: "uid"' "${path}"
 sed -i '/E_EMAIL/c\    AML_LDAP_PROFILE_EMAIL: "mail"' "${path}"
 sed -i '/E_DISPLAYNAME/c\    AML_LDAP_PROFILE_DISPLAYNAME: "displayName"' "${path}"
 sed -i '/E_GROUPS/c\    AML_LDAP_PROFILE_GROUPS: "memberOf"' "${path}"
-sed -i '/ER_URL/c\    AML_LDAP_SERVER_URL: "ldaps://openldap:636"' "${path}"
+sed -i '/ER_URL/c\    AML_LDAP_SERVER_URL: "ldaps://fcai-openldap:636"' "${path}"
 sed -i '/R_BINDDN/c\    AML_LDAP_SERVER_BINDDN: "cn=Manager,dc=ibm,dc=com"' "${path}"
 sed -i '/AML_LDAP_SERVER_BINDCREDENTIALS/d' "${path}"
 echo '    AML_LDAP_SERVER_BINDCREDENTIALS: "aml4u"' >> ${path}
@@ -169,9 +172,11 @@ cd -
 log.div "Script completed"
 log.info "Verify the results above and try to login below. Re-run this script if you're seeing problems."
 
-log.div "Next Steps"
-printf "%-30s%-30s\n" "Open this URL" "https://$(hostname -f):30400"
-printf "%-30s%-30s\n" "Enter your credentials" "(See the list below)"
+# Get the IP of the NIC used as default gateway
+IP=$(ip route get 1 | awk '{print $NF;exit}')
+
+log.div "Next Step"
+printf "%-30s%-30s\n" "Open GUI URL" "https://$(hostname -f):30400"
 
 log.div "Usernames and Passwords"
 printf "%-30s%-30s\n" "admin1" "aml4u"
@@ -181,7 +186,13 @@ printf "%-30s%-30s\n" "analyst1" "aml4u"
 
 log.div "Troubleshooting"
 printf "%-30s%-30s\n" "Inspect UI's logs" "kubectl logs \$(kubectl get pods | grep fcainodejs | awk '{print \$1}')"
-printf "%-30s%-30s\n" "Correct script?" "If you have apar1, be sure this script is specific to apar1."
+printf "%-30s%-30s\n" "Correct script?" "If you have an APAR (e.g., apar1), be sure this script is specific to that APAR."
+
+log.div "Optional: LDAP client"
+printf "%-30s%-30s\n" "Configure LDAP client 1/4" "Point your LDAP client here: ldaps://fcai-openldap:30636"
+printf "%-30s%-30s\n" "Configure LDAP client 2/4" "Login/bind as: cn=Manager,dc=ibm,dc=com with password: aml4u"
+printf "%-30s%-30s\n" "Configure LDAP client 3/4" "In /etc/hosts (or equivalent), add this entry (modify as needed): ${IP} fcai-openldap"
+printf "%-30s%-30s\n" "Configure LDAP client 4/4" "Run this command and add the resulting cert into your ldap client: cat ${base}/ldap.crt"
 
 echo
 echo
