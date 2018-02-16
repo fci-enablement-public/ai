@@ -151,6 +151,7 @@ sleep 5
 
 log.div "Adding openldap's certificate to nodejs"
 path="${base}/ldap.crt"
+
 log.info "copying openldap pod's cert to "${path}""
 echo "kubectl exec -ti $(kubectl get pods | grep fcai-openldap | awk '{print $1}') -- /usr/bin/cat /etc/openldap/certs/slapd-crt.pem > "${path}""
 kubectl exec -ti $(kubectl get pods | grep fcai-openldap | awk '{print $1}') -- /usr/bin/cat /etc/openldap/certs/slapd-crt.pem > "${path}"
@@ -184,16 +185,17 @@ printf "%-30s%-30s\n" "investigator1" "aml4u"
 printf "%-30s%-30s\n" "supervisor1" "aml4u"
 printf "%-30s%-30s\n" "analyst1" "aml4u"
 
+log.div "Optional: LDAP client"
+printf "%-30s%-30s\n" "Configure LDAP client 1/4" "Point your LDAP client here: ldaps://fcai-openldap:30636"
+printf "%-30s%-30s\n" "Configure LDAP client 2/4" "In LDAP client's /etc/hosts (or equivalent), add this entry (modify IP if needed): ${IP} fcai-openldap"
+printf "%-30s%-30s\n" "Configure LDAP client 3/4" "Login/bind as: cn=Manager,dc=ibm,dc=com with password: aml4u"
+printf "%-30s%-30s\n" "Configure LDAP client 4/4" "Run this command and add the resulting cert into your LDAP client: cat ${base}/ldap.crt"
+
 log.div "Troubleshooting"
 printf "%-30s%-30s\n" "Inspect UI's logs" "kubectl logs \$(kubectl get pods | grep fcainodejs | awk '{print \$1}')"
 printf "%-30s%-30s\n" "Correct script?" "If you have an APAR (e.g., apar1), be sure this script is specific to that APAR."
-
-log.div "Optional: LDAP client"
-printf "%-30s%-30s\n" "Configure LDAP client 1/5" "Point your LDAP client here: ldaps://fcai-openldap:30636"
-printf "%-30s%-30s\n" "Configure LDAP client 2/5" "In LDAP client's /etc/hosts (or equivalent), add this entry (modify as needed): ${IP} fcai-openldap"
-printf "%-30s%-30s\n" "Configure LDAP client 3/5" "Login/bind as: cn=Manager,dc=ibm,dc=com with password: aml4u"
-printf "%-30s%-30s\n" "Configure LDAP client 4/5" "Run this command and add the resulting cert into your ldap client: cat ${base}/ldap.crt"
-printf "%-30s%-30s\n" "Configure LDAP client 5/5" "Test a connection from the client: ldapsearch -d5 -x -H ldaps://fcai-openldap:30636 -D cn=Manager,dc=ibm,dc=com -w aml4u -b dc=ibm,dc=com -s sub 'objectclass=*' 2>&1| less"
+printf "%-30s%-30s\n" "LDAP client installed?" "Run this on RedHat, CentOS, or Fedora: yum install openldap-clients"
+printf "%-30s%-30s\n" "Test from LDAP client" "ldapsearch -d5 -x -H ldaps://fcai-openldap:30636 -D cn=Manager,dc=ibm,dc=com -w aml4u -b dc=ibm,dc=com -s sub 'objectclass=*' 2>&1| less"
 
 echo
 echo
