@@ -109,9 +109,6 @@ EOL
 # validate file creation
 [[ -f "${svc_path}" ]] && log.info "created "${svc_path}"" || log.error "could not create "${svc_path}""
 
-# create the container
-fcai-docker create -f $rs_path -s $svc_path --ipAddress 172.19.0.8
-
 log.div "Update FCAI properties"
 props_path="${base}/fcai.properties"
 [[ -f "${props_path}" ]] || log.error ""${props_path}" does not exist. This script will probably fail."
@@ -139,6 +136,9 @@ log.div "Update Config Map"
 cm_path="${base}/fcai-configmap.yaml"
 [[ -f "${cm_path}" ]] || log.error ""${cm_path}" does not exist. This script will probably fail."
 fcai-docker create -f fcai-configmap.yaml --dbHost 172.19.0.2 --dbPort 56000 --esHost 172.19.0.4 --esPort 9200 --lsHost 172.19.0.5 --lsPort 5000 --redisHost 172.19.0.6 --redisPort 6379
+
+# create & run the openldap container
+fcai-docker create -f $rs_path -s $svc_path --ipAddress 172.19.0.8
 
 log.div "Adding openldap's certificate to nodejs"
 # make time for the container to extract the slapd cert
