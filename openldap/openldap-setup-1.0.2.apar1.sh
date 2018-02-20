@@ -48,7 +48,7 @@ apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
   name: fcai-openldap
-spec :
+spec:
   replicas: 1
   minReadySeconds: 10
   strategy :
