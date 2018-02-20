@@ -50,33 +50,35 @@ log.info "deleting previous deployment"
 fcai-docker delete -f $rs_path > /dev/null
 
 log.info "configuring openldap container"
-cat > "${rs_path}" <<-EOF
-        apiVersion: apps/v1beta1 
-        kind: ReplicaSet
-        metadata: 
-          name: fcaiol
-        spec : 
-          replicas: 1 
-          minReadySeconds: 10 
-          strategy : 
-             type: RollingUpdate 
-             rollingUpdate: 
-               maxUnavailable: 1 
-               maxSurge: 1 
-          template: 
-             metadata: 
-               labels: 
-                 name: fcaiol
-             spec: 
-               containers: 
-               - name: fcaiol
-                 image: fcienablementpublic/openldap
-                 imagePullPolicy: Always
-                 ports: 
-                 - containerPort: 389
-                   name: ldap
-                 - containerPort: 636
-                   name: ldaps
+cat > "${rs_path}" <<EOF
+apiVersion: apps/v1beta1
+kind: ReplicaSet
+metadata:
+  name: fcai-openldap
+spec:
+  replicas: 1
+  minReadySeconds: 10
+  strategy :
+     type: RollingUpdate
+     rollingUpdate:
+       maxUnavailable: 1
+       maxSurge: 1
+  template:
+     metadata:
+       labels:
+         name: fcai-openldap
+     spec:
+       containers:
+       - name: fcai-openldap
+         image: fcienablementpublic/openldap:1.0.2
+         imagePullPolicy: Always
+         ports:
+         - containerPort: 389
+           name: ldap
+           hostPort: 11389
+         - containerPort: 636
+           name: ldaps
+           hostPort: 11636
 EOF
 
 # validate file creation
@@ -85,22 +87,23 @@ EOF
 # service
 log.div "Configuring openldap service"
 log.info "Creating openldap service"
-svc_path="${base}/fcaiol-service.yaml"
+svc_path="${base}/fcai-openldap-service.yaml"
 cat > "${svc_path}" <<-EOL
 	apiVersion: v1
 	kind: Service
 	metadata:
-	  name: openldap
+	  name: fcai-openldap
 	spec:
+	  type: NodePort
 	  ports:
 	  - port: 389
 	    name: ldap
-	    targetPort: 389
+	    nodePort: 30389
 	  - port: 636
 	    name: ldaps 
-	    targetPort: 636
+	    nodePort: 30636
 	  selector:
-	    name: fcaiol 
+	    name: fcai-openldap 
 EOL
 
 # validate file creation
@@ -109,32 +112,32 @@ EOL
 # create the container
 fcai-docker create -f $rs_path -s $svc_path --ipAddress 172.19.0.8
 
+log.div "Update FCAI properties"
+props_path="${base}/fcai.properties"
+[[ -f "${props_path}" ]] || log.error ""${props_path}" does not exist. This script will probably fail."
+log.info "updating FCAI properties for openldap"
+sed -i '/aml.group.analyst/c\aml.group.analyst = cn=analysts,dc=ibm,dc=com' "${props_path}"
+sed -i '/aml.group.investigator/c\aml.group.investigator = cn=investigators,dc=ibm,dc=com' "${props_path}"
+sed -i '/aml.group.supervisor/c\aml.group.supervisor = cn=supervisors,dc=ibm,dc=com' "${props_path}"
+sed -i '/aml.group.admin/c\aml.group.admin = cn=admins,dc=ibm,dc=com' "${props_path}"
+
+sed -i '/aml.ldap.profile.id/c\aml.ldap.profile.id = uid' "${props_path}"
+sed -i '/aml.ldap.profile.email/c\aml.ldap.profile.email = mail' "${props_path}"
+sed -i '/aml.ldap.profile.displayname/c\aml.ldap.profile.displayname = displayName' "${props_path}"
+sed -i '/aml.ldap.profile.groups/c\aml.ldap.profile.groups = memberOf' "${props_path}"
+
+sed -i '/aml.ldap.server.url/c\aml.ldap.server.url = ldaps://fcai-openldap:636' "${props_path}"
+sed -i '/aml.ldap.server.binddn/c\aml.ldap.server.binddn = cn=Manager,dc=ibm,dc=com' "${props_path}"
+sed -i '/aml.ldap.server.bindcredentials/c\aml.ldap.server.bindcredentials = YW1sNHU=' "${props_path}"
+sed -i '/aml.ldap.server.searchbase/c\aml.ldap.server.searchbase = dc=ibm,dc=com' "${props_path}"
+sed -i '/aml.ldap.server.username.mapping/c\aml.ldap.server.username.mapping = uid' "${props_path}"
+sed -i '/aml.ldap.server.cert/c\aml.ldap.server.cert = ldap.crt' "${props_path}"
+
+$base/fcai-props-to-yaml.sh
+
 log.div "Update Config Map"
 cm_path="${base}/fcai-configmap.yaml"
-
-# validate path exists
 [[ -f "${cm_path}" ]] || log.error ""${cm_path}" does not exist. This script will probably fail."
-log.info "updating config map values for openldap"
-sed -i '/GROUP_ANALYST/c\    AML_GROUP_ANALYST: "cn=analysts,dc=ibm,dc=com"' "${cm_path}"
-sed -i '/GROUP_INVESTIGATOR/c\    AML_GROUP_INVESTIGATOR: "cn=investigators,dc=ibm,dc=com"' "${cm_path}"
-sed -i '/GROUP_SUPERVISOR/c\    AML_GROUP_SUPERVISOR: "cn=supervisors,dc=ibm,dc=com"' "${cm_path}"
-sed -i '/GROUP_ADMIN/c\    AML_GROUP_ADMIN: "cn=admins,dc=ibm,dc=com"' "${cm_path}"
-sed -i '/E_ID/c\    AML_LDAP_PROFILE_ID: "uid"' "${cm_path}"
-sed -i '/E_EMAIL/c\    AML_LDAP_PROFILE_EMAIL: "mail"' "${cm_path}"
-sed -i '/E_DISPLAYNAME/c\    AML_LDAP_PROFILE_DISPLAYNAME: "displayName"' "${cm_path}"
-sed -i '/E_GROUPS/c\    AML_LDAP_PROFILE_GROUPS: "memberOf"' "${cm_path}"
-sed -i '/ER_URL/c\    AML_LDAP_SERVER_URL: "ldaps://openldap:636"' "${cm_path}"
-sed -i '/R_BINDDN/c\    AML_LDAP_SERVER_BINDDN: "cn=Manager,dc=ibm,dc=com"' "${cm_path}"
-sed -i '/AML_LDAP_SERVER_BINDCREDENTIALS/d' "${cm_path}"
-echo '    AML_LDAP_SERVER_BINDCREDENTIALS: "{base64}YW1sNHU="' >> ${cm_path}
-sed -i '/ARCHBASE/c\    AML_LDAP_SERVER_SEARCHBASE: "dc=ibm,dc=com"' "${cm_path}"
-sed -i '/E_MAPPING/c\    AML_LDAP_SERVER_USERNAME_MAPPING: "uid"' "${cm_path}"
-sed -i '/ER_CERT/c\    AML_LDAP_SERVER_CERT: "ldap.crt"' "${cm_path}"
-
-log.info "allowing self-signed certificates. do NOT do this in production!!! See nodejs GitHub issue 5258"
-INSECURE='NODE_TLS_REJECT_UNAUTHORIZED: "0"'
-grep -q -F "${INSECURE}" "${cm_path}" || echo "${INSECURE}" >> "${cm_path}"
-
 fcai-docker create -f fcai-configmap.yaml --dbHost 172.19.0.2 --dbPort 56000 --esHost 172.19.0.4 --esPort 9200 --lsHost 172.19.0.5 --lsPort 5000 --redisHost 172.19.0.6 --redisPort 6379
 
 log.div "Adding openldap's certificate to nodejs"
@@ -142,15 +145,13 @@ log.div "Adding openldap's certificate to nodejs"
 sleep 10 
 path="${base}/ldap.crt"
 log.info "copying openldap cert to "${path}""
-echo "docker cp $(docker ps -q -f name=fcaiol):/etc/openldap/certs/slapd-crt.pem $path"
-docker cp $(docker ps -q -f name=fcaiol):/etc/openldap/certs/slapd-crt.pem $path
-
-# validate path exists
+echo "docker cp $(docker ps -q -f name=fcai-openldap):/etc/openldap/certs/slapd-crt.pem $path"
+docker cp $(docker ps -q -f name=fcai-openldap):/etc/openldap/certs/slapd-crt.pem $path
 [[ -f "${path}" ]] || log.error ""${path}" does not exist. This script will probably fail."
 
 log.info "re-creating the nodejs container"
 fcai-docker delete -f fcainodejs-rs.yaml
-fcai-docker create -f fcainodejs-rs.yaml  -s fcainodejs-service.yaml --ipAddress 172.19.0.7 -u 1000 --copy "$base/*.crt,$base/*.pem" --addHost openldap:172.19.0.8
+fcai-docker create -f fcainodejs-rs.yaml  -s fcainodejs-service.yaml --ipAddress 172.19.0.7 -u 1000 --copy "$base/*.crt,$base/*.pem" --addHost fcai-openldap:172.19.0.8
 
 log.div "Script completed"
 echo
